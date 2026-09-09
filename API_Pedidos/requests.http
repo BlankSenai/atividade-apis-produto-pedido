@@ -1,10 +1,28 @@
-### Health check
-GET http://localhost:4000/
+@host = http://localhost:4000
 
-###
+# Pré-requisitos:
+#   1. API de Produtos rodando em http://localhost:8000 (com `python seed.py`)
+#   2. API de Pedidos rodando em http://localhost:4000
+#
+# As requisições estão na ordem em que devem ser executadas. O pedido criado
+# no início é usado pelo fluxo de status e removido no final, de modo que o
+# estoque do produto 1 termina igual ao que estava antes. Por isso o arquivo
+# pode ser rodado quantas vezes quiser sem sujar o banco.
+#
+# Os blocos do fluxo referenciam o id do pedido criado via `{{criarPedido...}}`,
+# então precisam que o bloco "Criar pedido" tenha sido executado antes nesta
+# sessão. Para disparar um bloco isolado, troque a referência por um id fixo.
 
-### Criar pedido
-POST http://localhost:4000/pedidos
+### Health check (200)
+GET {{host}}/
+
+# ==========================================================================
+# CRIAÇÃO
+# ==========================================================================
+
+### Criar pedido (201) - debita 3 unidades do produto 1
+# @name criarPedido
+POST {{host}}/pedidos
 Content-Type: application/json
 
 {
@@ -12,93 +30,106 @@ Content-Type: application/json
   "quantidade": 3
 }
 
-###
-
-### Listar pedidos
-GET http://localhost:4000/pedidos
-
-###
-
-### Listar pedidos com paginação
-GET http://localhost:4000/pedidos?page=1&limit=5
-
-###
-
-### Listar pedidos filtrados por status
-GET http://localhost:4000/pedidos?status=confirmado
-
-###
-
-### Buscar pedido por ID
-GET http://localhost:4000/pedidos/1
-
-###
-
-### Cancelar pedido
-PUT http://localhost:4000/pedidos/1
+### Criar sem produto_id (400)
+POST {{host}}/pedidos
 Content-Type: application/json
 
-{
-  "status": "cancelado"
-}
+{ "quantidade": 2 }
 
-###
-
-### Deletar pedido
-DELETE http://localhost:4000/pedidos/1
-
-###
-
-### Teste: produto inexistente
-POST http://localhost:4000/pedidos
+### Criar com quantidade <= 0 (400)
+POST {{host}}/pedidos
 Content-Type: application/json
 
-{
-  "produto_id": 9999,
-  "quantidade": 1
-}
+{ "produto_id": 1, "quantidade": 0 }
 
-###
-
-### Teste: quantidade inválida
-POST http://localhost:4000/pedidos
+### Criar com quantidade fracionada (400)
+POST {{host}}/pedidos
 Content-Type: application/json
 
-{
-  "produto_id": 1,
-  "quantidade": 0
-}
+{ "produto_id": 1, "quantidade": 1.5 }
 
-###
-
-### Teste: sem produto_id
-POST http://localhost:4000/pedidos
+### Criar com produto inexistente (404)
+POST {{host}}/pedidos
 Content-Type: application/json
 
-{
-  "quantidade": 2
-}
+{ "produto_id": 9999, "quantidade": 1 }
 
-### Cancelar pedido — devolve o estoque na API de Produtos
-PUT http://localhost:4000/pedidos/1
+### Criar sem estoque suficiente (409) - a API de Produtos recusa a baixa
+POST {{host}}/pedidos
 Content-Type: application/json
 
-{
-  "status": "cancelado"
-}
+{ "produto_id": 1, "quantidade": 99999 }
 
-### Cancelar de novo — nao devolve o estoque duas vezes (idempotente)
-PUT http://localhost:4000/pedidos/1
+# ==========================================================================
+# CONSULTA
+# ==========================================================================
+
+### Listar (paginado, default page=1 limit=10)
+GET {{host}}/pedidos
+
+### Listar com paginação
+GET {{host}}/pedidos?page=1&limit=5
+
+### Listar filtrando por status
+GET {{host}}/pedidos?status=confirmado
+
+### Listar filtrando por status sem resultado (200, lista vazia)
+GET {{host}}/pedidos?status=cancelado
+
+### Buscar por id (200)
+GET {{host}}/pedidos/{{criarPedido.response.body.$.id}}
+
+### Buscar id inexistente (404)
+GET {{host}}/pedidos/9999
+
+# ==========================================================================
+# STATUS - cada troca ajusta o estoque na API de Produtos
+#
+# Confira o efeito colateral em: GET http://localhost:8000/produtos/1/estoque
+# ==========================================================================
+
+### Cancelar pedido (200) - devolve as 3 unidades ao estoque
+PUT {{host}}/pedidos/{{criarPedido.response.body.$.id}}
 Content-Type: application/json
 
-{
-  "status": "cancelado"
-}
+{ "status": "cancelado" }
 
-### Reativar pedido cancelado — debita o estoque de novo (409 se faltar)
-PUT http://localhost:4000/pedidos/1
+### Cancelar de novo (200) - idempotente, não devolve o estoque duas vezes
+PUT {{host}}/pedidos/{{criarPedido.response.body.$.id}}
 Content-Type: application/json
 
-{
-  "status": "confirmado"
-}
+{ "status": "cancelado" }
+
+### Reativar pedido cancelado (200) - debita as 3 unidades de novo
+PUT {{host}}/pedidos/{{criarPedido.response.body.$.id}}
+Content-Type: application/json
+
+{ "status": "confirmado" }
+
+### Atualizar sem status no body (400)
+PUT {{host}}/pedidos/{{criarPedido.response.body.$.id}}
+Content-Type: application/json
+
+{}
+
+### Atualizar com status inválido (400)
+PUT {{host}}/pedidos/{{criarPedido.response.body.$.id}}
+Content-Type: application/json
+
+{ "status": "entregue" }
+
+### Atualizar id inexistente (404)
+PUT {{host}}/pedidos/9999
+Content-Type: application/json
+
+{ "status": "cancelado" }
+
+# ==========================================================================
+# REMOÇÃO
+# ==========================================================================
+
+### Remover pedido (204) - estava confirmado, então devolve o estoque
+DELETE {{host}}/pedidos/{{criarPedido.response.body.$.id}}
+
+### Remover id inexistente (404)
+DELETE {{host}}/pedidos/9999
