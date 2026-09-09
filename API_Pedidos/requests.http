@@ -1,0 +1,104 @@
+### Health check
+GET http://localhost:4000/
+
+###
+
+### Criar pedido
+POST http://localhost:4000/pedidos
+Content-Type: application/json
+
+{
+  "produto_id": 1,
+  "quantidade": 3
+}
+
+###
+
+### Listar pedidos
+GET http://localhost:4000/pedidos
+
+###
+
+### Listar pedidos com paginação
+GET http://localhost:4000/pedidos?page=1&limit=5
+
+###
+
+### Listar pedidos filtrados por status
+GET http://localhost:4000/pedidos?status=confirmado
+
+###
+
+### Buscar pedido por ID
+GET http://localhost:4000/pedidos/1
+
+###
+
+### Cancelar pedido
+PUT http://localhost:4000/pedidos/1
+Content-Type: application/json
+
+{
+  "status": "cancelado"
+}
+
+###
+
+### Deletar pedido
+DELETE http://localhost:4000/pedidos/1
+
+###
+
+### Teste: produto inexistente
+POST http://localhost:4000/pedidos
+Content-Type: application/json
+
+{
+  "produto_id": 9999,
+  "quantidade": 1
+}
+
+###
+
+### Teste: quantidade inválida
+POST http://localhost:4000/pedidos
+Content-Type: application/json
+
+{
+  "produto_id": 1,
+  "quantidade": 0
+}
+
+###
+
+### Teste: sem produto_id
+POST http://localhost:4000/pedidos
+Content-Type: application/json
+
+{
+  "quantidade": 2
+}
+
+### Cancelar pedido — devolve o estoque na API de Produtos
+PUT http://localhost:4000/pedidos/1
+Content-Type: application/json
+
+{
+  "status": "cancelado"
+}
+
+### Cancelar de novo — nao devolve o estoque duas vezes (idempotente)
+PUT http://localhost:4000/pedidos/1
+Content-Type: application/json
+
+{
+  "status": "cancelado"
+}
+
+### Reativar pedido cancelado — debita o estoque de novo (409 se faltar)
+PUT http://localhost:4000/pedidos/1
+Content-Type: application/json
+
+{
+  "status": "confirmado"
+}

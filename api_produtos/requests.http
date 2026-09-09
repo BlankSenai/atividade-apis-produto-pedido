@@ -1,0 +1,161 @@
+@host = http://localhost:8000
+
+### Health check
+GET {{host}}/
+
+### Criar produto
+POST {{host}}/produtos
+Content-Type: application/json
+
+{
+  "nome": "Teclado Mecânico",
+  "descricao": "Switch azul, ABNT2",
+  "preco": 250.0,
+  "categoria": "Periféricos",
+  "quantidade_estoque": 20
+}
+
+### Criar produto inválido - preco <= 0 (400)
+POST {{host}}/produtos
+Content-Type: application/json
+
+{ "nome": "Produto ruim", "preco": 0 }
+
+### Criar produto inválido - nome vazio (400)
+POST {{host}}/produtos
+Content-Type: application/json
+
+{ "nome": "   ", "preco": 10 }
+
+### Listar (paginado, default page=1 limit=10)
+GET {{host}}/produtos
+
+### Listar com paginação
+GET {{host}}/produtos?page=1&limit=3
+
+### Listar filtrando por categoria (match exato)
+GET {{host}}/produtos?categoria=Periféricos
+
+### Listar filtrando por nome (busca parcial)
+GET {{host}}/produtos?nome=mou
+
+### Listar combinando filtros
+GET {{host}}/produtos?page=1&limit=10&nome=teclado&categoria=Periféricos
+
+### Buscar por id
+GET {{host}}/produtos/1
+
+### Buscar id inexistente (404)
+GET {{host}}/produtos/999
+
+### Atualizar produto (não altera estoque)
+PUT {{host}}/produtos/1
+Content-Type: application/json
+
+{
+  "nome": "Teclado Mecânico RGB",
+  "descricao": "Switch marrom, ABNT2",
+  "preco": 279.9,
+  "categoria": "Periféricos"
+}
+
+### Atualizar id inexistente (404)
+PUT {{host}}/produtos/999
+Content-Type: application/json
+
+{ "nome": "Qualquer" }
+
+### Remover produto (204)
+DELETE {{host}}/produtos/6
+
+### Remover id inexistente (404)
+DELETE {{host}}/produtos/999
+
+
+# ==========================================================================
+# ESTOQUE - contrato de integração com a API de Pedidos
+# ==========================================================================
+
+### Consultar estoque
+GET {{host}}/produtos/1/estoque
+
+### Consultar estoque de id inexistente (404)
+GET {{host}}/produtos/999/estoque
+
+### Diminuir estoque (200)
+POST {{host}}/produtos/1/estoque/baixa
+Content-Type: application/json
+
+{ "quantidade": 3 }
+
+### Diminuir estoque - insuficiente (409)
+POST {{host}}/produtos/5/estoque/baixa
+Content-Type: application/json
+
+{ "quantidade": 9999 }
+
+### Diminuir estoque - quantidade <= 0 (400)
+POST {{host}}/produtos/1/estoque/baixa
+Content-Type: application/json
+
+{ "quantidade": 0 }
+
+### Diminuir estoque - sem quantidade no body (400)
+POST {{host}}/produtos/1/estoque/baixa
+Content-Type: application/json
+
+{}
+
+### Diminuir estoque - produto inexistente (404)
+POST {{host}}/produtos/999/estoque/baixa
+Content-Type: application/json
+
+{ "quantidade": 1 }
+
+
+### Repor estoque - estorno de pedido cancelado (200)
+POST {{host}}/produtos/1/estoque/reposicao
+Content-Type: application/json
+
+{ "quantidade": 3 }
+
+### Repor estoque - quantidade <= 0 (400)
+POST {{host}}/produtos/1/estoque/reposicao
+Content-Type: application/json
+
+{ "quantidade": 0 }
+
+### Repor estoque - sem quantidade no body (400)
+POST {{host}}/produtos/1/estoque/reposicao
+Content-Type: application/json
+
+{}
+
+### Repor estoque - produto inexistente (404)
+POST {{host}}/produtos/999/estoque/reposicao
+Content-Type: application/json
+
+{ "quantidade": 1 }
+
+
+# ==========================================================================
+# Fluxo que a API de Pedidos executa ao criar um pedido
+# ==========================================================================
+
+### 1) Confere se o produto existe
+GET {{host}}/produtos/2
+
+### 2) Confere a disponibilidade
+GET {{host}}/produtos/2/estoque
+
+### 3) Debita o estoque
+POST {{host}}/produtos/2/estoque/baixa
+Content-Type: application/json
+
+{ "quantidade": 2 }
+
+### 4) Se o pedido for cancelado, a API de Pedidos devolve o estoque
+POST {{host}}/produtos/2/estoque/reposicao
+Content-Type: application/json
+
+{ "quantidade": 2 }

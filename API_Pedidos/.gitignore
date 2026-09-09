@@ -1,0 +1,5 @@
+.env
+node_modules
+pedidos.db
+pedidos.db-shm
+pedidos.db-wal
